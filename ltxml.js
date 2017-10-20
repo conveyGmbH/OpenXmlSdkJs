@@ -1045,7 +1045,31 @@ Email: eric@ericwhite.com
                         break;
                     }
                     char = textToAdd.charCodeAt(tc);
-                    if ((char >= 40 && char <= 59) ||
+                    if (char >= 0xd000 && char < 0xdfff) {
+                        if (ts !== tc) {
+                            if (isElement) {
+                                xt = new Ltxml.XText(textToAdd.substring(ts, tc));
+                                xt.parent = xobj;
+                            }
+                            else {
+                                xt = textToAdd.substring(ts, tc);
+                            }
+                            putContentFunc(xt);
+                        }
+                        if (tc < length - 1) {
+                            tc++;
+                            // UTF-16 encodes 0x10000-0x10FFFF by 
+                            // subtracting 0x10000 and splitting the 
+                            // 20 bits of 0x0-0xFFFFF into two halves 
+                            char = 0x10000 + (((char & 0x3ff) << 10) | (textToAdd.charCodeAt(tc) & 0x3ff));
+                            xe = new Ltxml.XEntity("#x" + char.toString(16));
+                            xe.parent = xobj;
+                            putContentFunc(xe);
+                        }
+                        tc++;
+                        ts = tc;
+                        continue;
+                    } else if ((char >= 40 && char <= 59) ||
                         (char >= 63 && char <= 126)) {
                         tc++;
                         continue;
