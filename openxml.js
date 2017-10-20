@@ -839,14 +839,14 @@ OpenXmlRelationship
             if (!targetMode) {
                 targetMode = "Internal";
             }
-            var rootRelationshipPart = this.getPartByUri("/_rels/.rels");
-            if (!rootRelationshipPart) {
+            var rootRelationshipsPart = this.getPartByUri("/_rels/.rels");
+            if (!rootRelationshipsPart) {
                 rootRelationshipsPart = this.addPart("/_rels/.rels", this.contentTypes.relationships, "xml",
                     new XDocument(
                         new XElement(PKGREL.Relationships,
                             new XAttribute("xmlns", pkgRelNs.namespaceName))));
             }
-            addRelationshipToRelPart(rootRelationshipPart, relationshipId, relationshipType, target, targetMode);
+            addRelationshipToRelPart(rootRelationshipsPart, relationshipId, relationshipType, target, targetMode);
         }
 
         openXml.OpenXmlPackage.prototype.deleteRelationship = function (relationshipId) {
