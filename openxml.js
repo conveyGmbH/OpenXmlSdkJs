@@ -132,7 +132,7 @@ OpenXmlRelationship
             pkg.ctXDoc = XDocument.parse(ctf.data);
 
             for (var part in pkg.parts) {
-                if (part === "[Content_Types].xml")
+                if (part === "[Content_Types].xml" || (part.indexOf("[trash]")!=-1) )
                     continue;
                 var ct = pkg.getContentType(part);
                 var thisPart = pkg.parts[part];
@@ -153,7 +153,7 @@ OpenXmlRelationship
             });
             openFromZip(zip, pkg)
         }
-        
+
         function openFromBase64InternalAsync(pkg, base64data, cb) {
             var zip = null;
             var state = 1;
@@ -244,7 +244,7 @@ OpenXmlRelationship
             var xDoc = XDocument.parse(flatOpc);
             openFlatOpcFromXDoc(pkg, xDoc);
         }
-        
+
         function openFromFlatOpcInternalAsync(pkg, flatOpc, cb) {
             var doc = null;
             var state = 1;
@@ -282,7 +282,7 @@ OpenXmlRelationship
         openXml.OpenXmlPackage.prototype.openFromBase64 = function (base64data) {
             openFromBase64Internal(this, base64data);
         }
-        
+
         openXml.OpenXmlPackage.prototype.openFromBase64Async = function (base64data, cb) {
             openFromBase64InternalAsync(this, base64data, cb);
         }
@@ -310,7 +310,7 @@ OpenXmlRelationship
                 var thisPart = that.parts[part];
                 // test for null because if the part was deleted, it will be set to null, not undefined
                 if (thisPart !== null) {
-                    if (part === "[Content_Types].xml") {
+                    if (part === "[Content_Types].xml" || (part.indexOf("[trash]")!=-1) ) {
                         zip.file("[Content_Types].xml", that.ctXDoc.toString(false));
                     }
                     else {
@@ -376,7 +376,7 @@ OpenXmlRelationship
             });
             return b64;
         };
-        
+
         openXml.OpenXmlPackage.prototype.saveToBase64Async = function (cb) {
             var zip = null;
             var state = 1;
@@ -523,7 +523,7 @@ OpenXmlRelationship
             }
             return flatOpc.toString(true);
         };
-        
+
         openXml.OpenXmlPackage.prototype.saveToFlatOpcAsync = function (cb) {
             var xdec = new XDeclaration("1.0", "UTF-8", "yes");
             var nsa = new XAttribute(XNamespace.xmlns + "pkg",
@@ -664,7 +664,7 @@ OpenXmlRelationship
 
             return newPart;
         }
-        
+
         openXml.OpenXmlPackage.prototype.deletePart = function (part) {
             var uri = part.uri;
             this.parts[uri] = null;
@@ -682,7 +682,7 @@ OpenXmlRelationship
                 ctEl.remove();
             }
         }
-        
+
         function getRelationshipsFromRelsXml(pkg, part, relationshipPart) {
             var rxDoc = relationshipPart.getXDocument();
             var rels = rxDoc.getRoot().elements(PKGREL.Relationship)
@@ -710,7 +710,7 @@ OpenXmlRelationship
             var rels = getRelationshipsFromRelsXml(this, null, rootRelationshipsPart);
             return rels;
         }
-        
+
         openXml.OpenXmlPackage.prototype.getParts = function () {
             var parts = [];
             for (var part in this.parts) {
@@ -721,7 +721,7 @@ OpenXmlRelationship
             }
             return parts;
         }
-        
+
         openXml.OpenXmlPackage.prototype.getRelationshipsByRelationshipType = function (relationshipType) {
             var rootRelationshipsPart = this.getPartByUri("/_rels/.rels");
             var rxDoc = rootRelationshipsPart.getXDocument();
@@ -748,7 +748,7 @@ OpenXmlRelationship
                 .toArray();
             return rels;
         }
-        
+
         openXml.OpenXmlPackage.prototype.getPartsByRelationshipType = function (relationshipType) {
             var rels = this.getRelationshipsByRelationshipType(relationshipType);
             var parts = [];
@@ -766,7 +766,7 @@ OpenXmlRelationship
             }
             return parts[0];
         }
-        
+
         openXml.OpenXmlPackage.prototype.getRelationshipsByContentType = function (contentType) {
             var rootRelationshipsPart = this.getPartByUri("/_rels/.rels");
             if (rootRelationshipsPart) {
@@ -786,7 +786,7 @@ OpenXmlRelationship
             }
             return [];
         }
-        
+
         openXml.OpenXmlPackage.prototype.getPartsByContentType = function (contentType) {
             var rels = this.getRelationshipsByContentType(contentType);
             var parts = [];
@@ -804,7 +804,7 @@ OpenXmlRelationship
                 });
             return rel;
         }
-        
+
         openXml.OpenXmlPackage.prototype.getPartById = function (rId) {
             var rel = Enumerable.from(this.getRelationships())
                 .firstOrDefault(function (r) {
@@ -816,7 +816,7 @@ OpenXmlRelationship
             var part = this.getPartByUri(rel.targetFullName);
             return part;
         }
-        
+
         openXml.OpenXmlPackage.prototype.getPartByUri = function (uri) {
             var part = this.parts[uri];
             return part;
@@ -863,7 +863,7 @@ OpenXmlRelationship
 
         openXml.OpenXmlPackage.prototype.getContentType = function (uri) {
             var ctfile, ct, c;
-                
+
             ct = this.ctXDoc.descendants(CT.Override)
                 .firstOrDefault(function (o) {
                     return o.attribute("PartName").value === uri;
@@ -930,7 +930,7 @@ OpenXmlRelationship
             }
             return pa;
         };
-        
+
         /*********** OpenXmlPart ***********/
 
         openXml.OpenXmlPart = function (pkg, uri, contentType, partType, data) {
@@ -943,7 +943,7 @@ OpenXmlRelationship
             }
             this.data = data;
         };
-        
+
         openXml.OpenXmlPart.prototype.getXDocument = function () {
             if (this.partType === 'xml' && typeof this.data === 'string') {
                 var data = this.data;
@@ -967,13 +967,13 @@ OpenXmlRelationship
             var relsFileName = uri.substring(0, lastSlash) + "/_rels/" + partFileName + ".rels";
             return relsFileName;
         }
-        
+
         function getRelsPartOfPart(part) {
             var relsFileName = getRelsPartUriOfPart(part);
             var relsPart = part.pkg.getPartByUri(relsFileName);
             return relsPart;
         }
-        
+
         // returns all relationships
         openXml.OpenXmlPart.prototype.getRelationships = function () {
             var relsPart = getRelsPartOfPart(this);
@@ -983,7 +983,7 @@ OpenXmlRelationship
             }
             return [];
         }
-        
+
         // returns all related parts of the source part
         openXml.OpenXmlPart.prototype.getParts = function () {
             var parts = [];
@@ -996,7 +996,7 @@ OpenXmlRelationship
             }
             return parts;
         }
-        
+
         openXml.OpenXmlPart.prototype.getRelationshipsByRelationshipType = function (relationshipType) {
             var rels = [];
             var allRels = this.getRelationships();
@@ -1007,7 +1007,7 @@ OpenXmlRelationship
             }
             return rels;
         }
-        
+
         // returns all related parts of the source part with the given relationship type
         openXml.OpenXmlPart.prototype.getPartsByRelationshipType = function (relationshipType) {
             var parts = [];
@@ -1040,7 +1040,7 @@ OpenXmlRelationship
             }
             return rels;
         }
-        
+
         openXml.OpenXmlPart.prototype.getPartsByContentType = function (contentType) {
             var parts = [];
             var rels = this.getRelationshipsByContentType(contentType);
@@ -1306,7 +1306,7 @@ OpenXmlRelationship
 
             this.targetFullName = workingCurrentPath + workingTarget;
         }
-        
+
         /******************************** OpenXmlRelationship ********************************/
 
         openXml.util = {};
@@ -1435,7 +1435,7 @@ OpenXmlRelationship
 
         openXml.util.rPad = function (str, padLength, padChar) {
             //Use: openXml.util.rPad(string, Number of Characters, Character to Pad)
-            //Returns: string with the padChar appended to the right until the string 
+            //Returns: string with the padChar appended to the right until the string
             // is padLength in length
             var p = Math.max((padLength + 1) - str.length, 0);  //ignore jslint
             return str + Array(p).join(padChar);
@@ -1501,7 +1501,7 @@ OpenXmlRelationship
                 i: i
             }
         }
-        
+
         openXml.util.encode64 = function (input) {
             input = escape(input);
             var output = "";
@@ -1543,7 +1543,7 @@ OpenXmlRelationship
 
             return output;
         }
-        
+
         openXml.util.decode64 = function (input) {
             var output = "";
             var chr1, chr2, chr3 = "";
@@ -1585,7 +1585,7 @@ OpenXmlRelationship
 
             return unescape(output);
         }
-        
+
         openXml.entityMap =
         {
             "160": "nbsp",
@@ -1837,7 +1837,7 @@ OpenXmlRelationship
             "9829": "hearts",
             "9830": "diams"
         };
-        
+
         function convertToEntities(text) {
             var o, len, i, c, cs, em, grouped, retValue, str;
 
