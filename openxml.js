@@ -111,42 +111,52 @@ OpenXmlRelationship
 
         /******************************** OpenXmlPackage ********************************/
 
-        function openFromZip(zip, pkg) {
-            for (var f in zip.files) {
+        function openFromZip(zip, pkg, cb, type) {
+            var promises = [];
+            var addPart = function (f) {
                 var zipFile = zip.files[f];
                 if (!openXml.util.endsWith(f, "/")) {
-                    var partType = null;
-
                     var f2 = f;
                     if (f !== "[Content_Types].xml")
                         f2 = "/" + f;
-                    var newPart = new openXml.OpenXmlPart(pkg, f2, null, null, zipFile.data);
-                    pkg.parts[f2] = newPart;
 
+                    //var newPart = new openXml.OpenXmlPart(pkg, f2, null, null, zipFile.data);
+                    promises.push(zipFile.async("string").then(function (data) {
+                        var newPart = new openXml.OpenXmlPart(pkg, f2, null, null, data);
+                        pkg.parts[f2] = newPart;
+                    }));
                 }
+            };
+            for (var f in zip.files) {
+                addPart(f);
             }
-            var ctf = pkg.parts["[Content_Types].xml"];
-            if (ctf === null) {
-                throw "Invalid Open XML document: no [Content_Types].xml";
-            }
-            pkg.ctXDoc = XDocument.parse(ctf.data);
+            // now wait for all parts to get extracted...
+            Promise.all(promises).then(function() {
+                var ctf = pkg.parts["[Content_Types].xml"];
+                if (ctf === null) {
+                    throw "Invalid Open XML document: no [Content_Types].xml";
+                }
+                pkg.ctXDoc = XDocument.parse(ctf.data);
 
-            for (var part in pkg.parts) {
-                if (part === "[Content_Types].xml" || (part.indexOf("[trash]")!=-1) )
-                    continue;
-                var ct = pkg.getContentType(part);
-                var thisPart = pkg.parts[part];
-                thisPart.contentType = ct;
-                if (openXml.util.endsWith(ct, "xml")) {
-                    thisPart.partType = "xml";
+                for (var part in pkg.parts) {
+                    if (part === "[Content_Types].xml" || (part.indexOf("[trash]")!=-1) )
+                        continue;
+                    var ct = pkg.getContentType(part);
+                    var thisPart = pkg.parts[part];
+                    thisPart.contentType = ct;
+                    if (openXml.util.endsWith(ct, "xml")) {
+                        thisPart.partType = "xml";
+                    }
+                    if (!openXml.util.endsWith(ct, "xml")) {
+                        thisPart.partType = "binary";
+                    }
                 }
-                if (!openXml.util.endsWith(ct, "xml")) {
-                    thisPart.partType = "binary";
-                }
-            }
+                cb(pkg);
+            });
         }
 
         function openFromBase64Internal(pkg, base64data) {
+            throw new Error("This method has been removed! Please use openFromBase64InternalAsync instead.");
             var zip = new JSZip(base64data, {
                 base64: true,
                 checkCRC32: false
@@ -155,6 +165,14 @@ OpenXmlRelationship
         }
 
         function openFromBase64InternalAsync(pkg, base64data, cb) {
+            var zip = new JSZip();
+            zip.loadAsync(base64data, {
+                base64: true,
+                checkCRC32: false
+            }).then(function(zip) {
+                openFromZip(zip, pkg, cb, "base64");
+            });
+            /*
             var zip = null;
             var state = 1;
             var intervalId = setInterval(function () {
@@ -173,14 +191,24 @@ OpenXmlRelationship
                     return;
                 }
             }, 10);
+             */
         }
 
         function openFromBlobInternal(pkg, blob) {
+            throw new Error("This method has been removed! Please use openFromBlobInternalAsync instead.");
             var zip = new JSZip(blob);
             openFromZip(zip, pkg)
         }
 
         function openFromBlobInternalAsync(pkg, blob, cb) {
+            var zip = new JSZip();
+            zip.loadAsync(blob, {
+                base64: false,
+                checkCRC32: false
+            }).then(function (zip) {
+                openFromZip(zip, pkg, cb, "blob");
+            });
+            /*
             var zip = null;
             var state = 1;
             var intervalId = setInterval(function () {
@@ -196,6 +224,7 @@ OpenXmlRelationship
                     return;
                 }
             }, 10);
+             */
         }
 
         function openFlatOpcFromXDoc(pkg, doc) {
@@ -241,6 +270,7 @@ OpenXmlRelationship
         }
 
         function openFromFlatOpcInternal(pkg, flatOpc) {
+            throw new Error("This method has been removed! Please use openFromFlatOpcInternalAsync instead.");
             var xDoc = XDocument.parse(flatOpc);
             openFlatOpcFromXDoc(pkg, xDoc);
         }
@@ -263,23 +293,36 @@ OpenXmlRelationship
             }, 10);
         }
 
-        openXml.OpenXmlPackage = function (documentToOpen) {
+        openXml.OpenXmlPackage = function (documentToOpen, cb) {
             this.parts = {};
             this.ctXDoc = null;
-            if (documentToOpen !== undefined) {
-                if (openXml.util.isBase64(documentToOpen)) {
-                    openFromBase64Internal(this, documentToOpen);
-                }
-                else if (typeof documentToOpen === 'string') {
-                    openFromFlatOpcInternal(this, documentToOpen);
-                }
-                else {
-                    openFromBlobInternal(this, documentToOpen);
+            if (typeof documentToOpen !== "undefined") {
+                if (typeof cb === "function") {
+                    if (openXml.util.isBase64(documentToOpen)) {
+                        openFromBase64InternalAsync(this, documentToOpen, cb);
+                    }
+                    else if (typeof documentToOpen === 'string') {
+                        openFromFlatOpcInternalAsync(this, documentToOpen, cb);
+                    }
+                    else {
+                        openFromBlobInternalAsync(this, documentToOpen, cb);
+                    }
+                } else {
+                    if (openXml.util.isBase64(documentToOpen)) {
+                        openFromBase64Internal(this, documentToOpen);
+                    }
+                    else if (typeof documentToOpen === 'string') {
+                        openFromFlatOpcInternal(this, documentToOpen);
+                    }
+                    else {
+                        openFromBlobInternal(this, documentToOpen);
+                    }
                 }
             }
         }
 
         openXml.OpenXmlPackage.prototype.openFromBase64 = function (base64data) {
+            throw new Error("This method has been removed! Please use openFromBase64Async instead.");
             openFromBase64Internal(this, base64data);
         }
 
@@ -288,6 +331,7 @@ OpenXmlRelationship
         }
 
         openXml.OpenXmlPackage.prototype.openFromFlatOpc = function (flatOpc) {
+            throw new Error("This method has been removed! Please use openFromFlatOpcAsync instead.");
             openFromFlatOpcInternal(this, flatOpc);
         }
 
@@ -296,6 +340,7 @@ OpenXmlRelationship
         }
 
         openXml.OpenXmlPackage.prototype.openFromBlob = function (blob) {
+            throw new Error("This method has been removed! Please use openFromBlobAsync instead.");
             openFromBlobInternal(this, blob);
         }
 
@@ -368,6 +413,7 @@ OpenXmlRelationship
         }
 
         openXml.OpenXmlPackage.prototype.saveToBase64 = function () {
+            throw new Error("This method has been removed! Please use saveToBase64Async instead.");
             var zip = saveToZip(this);
             var b64 = zip.generate({
                 base64: true,
@@ -388,19 +434,21 @@ OpenXmlRelationship
                     return;
                 }
                 if (state === 2) {
-                    var b64 = zip.generate({
+                    zip.generateAsync({
                         base64: true,
                         compression: "deflate",
                         type: "base64"
+                    }).then(function (b64) {
+                        cb(b64);
                     });
                     clearInterval(intervalId);
-                    cb(b64);
                     return;
                 }
             }, 10);
         };
 
         openXml.OpenXmlPackage.prototype.saveToBlob = function () {
+            throw new Error("This method has been removed! Please use saveToBase64Async instead.");
             var zip = saveToZip(this);
             var blob = zip.generate({
                 blob: true,
@@ -421,13 +469,14 @@ OpenXmlRelationship
                     return;
                 }
                 if (state === 2) {
-                    var blob = zip.generate({
+                    zip.generateAsync({
                         blob: true,
                         base64: false,
                         type: "blob"
+                    }).then(function(blob) {
+                        cb(blob);
                     });
                     clearInterval(intervalId);
-                    cb(blob);
                     return;
                 }
             }, 10);
@@ -1469,6 +1518,113 @@ OpenXmlRelationship
             return s;
         };
 
+        openXml.util.decode_utf8 = function (str) {
+            // TODO(user): Use native implementations if/when available
+            var fc = String.fromCharCode;
+            var out = "";
+            for (var i = 0; i < str.length; i++) {
+                var c = str.charCodeAt(i);
+                if (c < 128) {
+                    out += fc(c);
+                } else if (c < 2048) {
+                    out += fc((c >> 6) | 192);
+                    out += fc((c & 63) | 128);
+                } else if (
+                    ((c & 0xFC00) === 0xD800) && (i + 1) < str.length &&
+                        ((str.charCodeAt(i + 1) & 0xFC00) === 0xDC00)) {
+                    // Surrogate Pair
+                    c = 0x10000 + ((c & 0x03FF) << 10) + (str.charCodeAt(++i) & 0x03FF);
+                    out += fc((c >> 18) | 240);
+                    out += fc(((c >> 12) & 63) | 128);
+                    out += fc(((c >> 6) & 63) | 128);
+                    out += fc((c & 63) | 128);
+                } else {
+                    out += fc((c >> 12) | 224);
+                    out += fc(((c >> 6) & 63) | 128);
+                    out += fc((c & 63) | 128);
+                }
+            }
+            return out;
+        }
+
+        openXml.util.encode_utf8 = function (argString) {
+            //  discuss at: http://phpjs.org/functions/utf8_encode/ 
+            // original by: Webtoolkit.info (http://www.webtoolkit.info/) 
+            // improved by: Kevin van Zonneveld (http://kevin.vanzonneveld.net) 
+            // improved by: sowberry 
+            // improved by: Jack 
+            // improved by: Yves Sucaet 
+            // improved by: kirilloid 
+            // bugfixed by: Onno Marsman 
+            // bugfixed by: Onno Marsman 
+            // bugfixed by: Ulrich 
+            // bugfixed by: Rafal Kukawski 
+            // bugfixed by: kirilloid 
+            //   example 1: utf8_encode('Kevin van Zonneveld'); 
+            //   returns 1: 'Kevin van Zonneveld' 
+
+
+            if (argString === null || typeof argString === 'undefined') {
+                return '';
+            }
+
+
+            // .replace(/\r\n/g, "\n").replace(/\r/g, "\n"); 
+            var string = (argString + '');
+            var utftext = '',
+              start, end, stringl = 0;
+
+
+            start = end = 0;
+            stringl = string.length;
+            for (var n = 0; n < stringl; n++) {
+                var c1 = string.charCodeAt(n);
+                var enc = null;
+
+
+                if (c1 < 128) {
+                    end++;
+                } else if (c1 > 127 && c1 < 2048) {
+                    enc = String.fromCharCode(
+                      (c1 >> 6) | 192, (c1 & 63) | 128
+                    );
+                } else if ((c1 & 0xF800) !== 0xD800) {
+                    enc = String.fromCharCode(
+                      (c1 >> 12) | 224, ((c1 >> 6) & 63) | 128, (c1 & 63) | 128
+                    );
+                } else {
+                    // surrogate pairs 
+                    if ((c1 & 0xFC00) !== 0xD800) {
+                        throw new RangeError('Unmatched trail surrogate at ' + n);
+                    }
+                    var c2 = string.charCodeAt(++n);
+                    if ((c2 & 0xFC00) !== 0xDC00) {
+                        throw new RangeError('Unmatched lead surrogate at ' + (n - 1));
+                    }
+                    c1 = ((c1 & 0x3FF) << 10) + (c2 & 0x3FF) + 0x10000;
+                    enc = String.fromCharCode(
+                      (c1 >> 18) | 240, ((c1 >> 12) & 63) | 128, ((c1 >> 6) & 63) | 128, (c1 & 63) | 128
+                    );
+                }
+                if (enc !== null) {
+                    if (end > start) {
+                        utftext += string.slice(start, end);
+                    }
+                    utftext += enc;
+                    start = end = n + 1;
+                }
+            }
+
+
+            if (end > start) {
+                utftext += string.slice(start, stringl);
+            }
+
+
+            return utftext;
+        }
+
+        /*
         openXml.util.encode_utf8 = function (s) {
             return unescape(encodeURIComponent(s));
         }
@@ -1476,6 +1632,7 @@ OpenXmlRelationship
         openXml.util.decode_utf8 = function (s) {
             return decodeURIComponent(escape(s));
         }
+        */
 
         var keyStr = "ABCDEFGHIJKLMNOP" +
                        "QRSTUVWXYZabcdef" +
