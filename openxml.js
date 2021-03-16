@@ -1,4 +1,4 @@
-﻿/***************************************************************************
+/***************************************************************************
 
 Copyright (c) Microsoft Corporation 2013.
 
@@ -1872,7 +1872,7 @@ OpenXmlRelationship
                     }
                     var zz = c.toString(16);//ignore jslint
                     o.push(new XEntity("#" + zz));
-                    //o.push("ÆŒŠ" + c.toString());
+                    //o.push("ƌ�" + c.toString());
                     continue; //ignore jslint
                 }
                 o.push(text.charAt(i));
